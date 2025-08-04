@@ -66,7 +66,8 @@
     const statusDisplay = document.getElementById('status');
     const highscoreDisplay = document.getElementById('highscore');
     let pieces = [], originalOrder = [], timer, time = 0, started = false;
-    let currentImage = 'IMG_20250804_213250.jpg'; // Gambar default
+    let currentImage = 'https://via.placeholder.com/400'; // Gambar default (ganti dengan 'ethos.png' jika disimpan lokal)
+    let touchedElement = null;
 
     // Fungsi untuk mengacak array
     function shuffleArray(array) {
@@ -79,14 +80,16 @@
     // Pemeriksaan solvabilitas untuk puzzle 4x4
     function isSolvable(order) {
       let inversions = 0;
-      for (let i = 0; i < order.length - 1; i++) {
-        for (let j = i + 1; j < order.length; j++) {
-          if (order[i] && order[j] && order[i] > order[j]) {
-            inversions++;
-          }
+      const flatOrder = order.map(pos => {
+        const [row, col] = pos.split('-').map(Number);
+        return row * 4 + col;
+      });
+      for (let i = 0; i < flatOrder.length - 1; i++) {
+        for (let j = i + 1; j < flatOrder.length; j++) {
+          if (flatOrder[i] > flatOrder[j]) inversions++;
         }
       }
-      return inversions % 2 === 0; // Puzzle solvable jika jumlah inversi genap
+      return inversions % 2 === 0;
     }
 
     // Mulai timer
@@ -169,6 +172,7 @@
     function dragStart(e) {
       dragged = e.target;
       dragged.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', dragged.dataset.position);
       if (!started) {
         started = true;
         startTimer();
@@ -203,11 +207,10 @@
     }
 
     // Touch handler untuk perangkat sentuh
-    let touchElement = null;
     function touchStart(e) {
       e.preventDefault();
-      touchElement = e.target;
-      touchElement.classList.add('dragging');
+      touchedElement = e.target;
+      touchedElement.classList.add('dragging');
       if (!started) {
         started = true;
         startTimer();
@@ -218,22 +221,22 @@
       e.preventDefault();
       const touch = e.touches[0];
       const target = document.elementFromPoint(touch.clientX, touch.clientY);
-      if (target && target.classList.contains('piece')) {
+      if (target && target.classList.contains('piece') && target !== touchedElement) {
         target.style.transform = 'scale(1.05)';
       }
     }
 
     function touchEnd(e) {
       e.preventDefault();
-      touchElement.classList.remove('dragging');
+      touchedElement.classList.remove('dragging');
       const touch = e.changedTouches[0];
       const target = document.elementFromPoint(touch.clientX, touch.clientY);
-      if (target && target.classList.contains('piece') && target !== touchElement) {
-        const draggedClone = touchElement.cloneNode(true);
+      if (target && target.classList.contains('piece') && target !== touchedElement) {
+        const draggedClone = touchedElement.cloneNode(true);
         const targetClone = target.cloneNode(true);
 
         container.replaceChild(draggedClone, target);
-        container.replaceChild(targetClone, touchElement);
+        container.replaceChild(targetClone, touchedElement);
 
         [draggedClone, targetClone].forEach(piece => {
           piece.setAttribute('draggable', true);
@@ -246,10 +249,8 @@
         });
         checkCompletion();
       }
-      Array.from(container.children).forEach(piece => {
-        piece.style.transform = 'scale(1)';
-      });
-      touchElement = null;
+      Array.from(container.children).forEach(piece => piece.style.transform = 'scale(1)');
+      touchedElement = null;
     }
 
     // Acak puzzle dengan memastikan solvabilitas
